@@ -1,0 +1,8 @@
+# Ignore compiled binary
+target/
+
+# Ignore Cargo lock file
+Cargo.lock
+
+# Ignore system files
+.DS_Store
