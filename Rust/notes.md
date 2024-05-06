@@ -39,6 +39,109 @@ cargo doc --open
 ```
 
 # Concepts
+## Ownership
+- All heap data must be owned by exactly one variable
+
+### Deallocation
+- Rust deallocates heap data once its owner goes out of scope (calls `drop()` function of the owner)
+
+
+### Moving
+- Ownership can be transferred by moves, which happen on assignments and function calls
+
+The following code assigns `b` to point to `a`'s data on the heap, and `a` is invalidated. It has been *moved*.
+```rs
+let a = Box::new([0; 1_000_000]);
+let b = a;
+```
+Thus, `a` owns the box at the first line. Then the next line moves ownership of the box from `a` to `b`. This is done whenever the type in question (`Box` in this case) does not implement the `Copy` trait.
+
+When the `Copy` trait is implemented & the data is stored on the stack (they go hand in hand): The following code *copies* the contents of `a` into `b`, so they have seperate values. This is because arrays and tuples implement the `Copy` trait if all their elements do.
+```rs
+let a = [0; 1_000_000];
+let b = a;
+```
+
+### Current Owner Use
+- Heap data can only be accessed through its current owner, not a previous owner (i.e. variables cannot be used/accessed after they have been *moved*)
+
+Ex: when a string is given as an argument in a method, this moves ownership of the string to the parameter in the function. The pointer to the data is copied: (https://rust-book.cs.brown.edu/ch04-01-what-is-ownership.html#collections-use-boxes)
+
+### Cloning Avoids Moves
+- `.clone()` performs a deep copy and does not *move* data
+```rs
+let first = String::from("Ferris");
+let first_clone = first.clone();
+let full = add_suffix(first_clone);
+println!("{full}, originally {first}");
+```
+At the end of this both `first` and `full` are safe to use.
+
+### Ownership in Functions
+Passing a value to a function will move or copy, just as assignment does.
+
+## References and Borrowing
+### Rules
+- At any given time, you can have either one mutable reference or any number of immutable references
+- References must always be valid
+
+### References
+- References are non-owning pointers (They *borrow*)
+```rs
+fn main() {
+    let s1 = String::from("hello");
+    let len = calculate_length(&s1);
+    println!("The length of '{}' is {}.", s1, len);
+}
+
+fn calculate_length(s: &String) -> usize {
+    s.len()
+}
+```
+
+### Mutable References
+- If you have a mutable reference to a value, you can have no other references to that value (while that mutable reference is being used)
+```rs
+fn main() {
+    let mut s = String::from("hello");
+    change(&mut s);
+}
+
+fn change(some_string: &mut String) {
+    some_string.push_str(", world");
+}
+```
+
+### Dereferencing Pointers
+Rust *implicitly* inserts dereferences and references in certain cases, such as calling a method with the dot operator
+```rs
+let x: Box<i32> = Box::new(-1);
+let x_abs1 = i32::abs(*x); // explicit dereference
+let x_abs2 = x.abs();      // implicit dereference
+assert_eq!(x_abs1, x_abs2);
+
+let r: &Box<i32> = &x;
+let r_abs1 = i32::abs(**r); // explicit dereference (twice)
+let r_abs2 = r.abs();       // implicit dereference (twice)
+assert_eq!(r_abs1, r_abs2);
+
+let s = String::from("Hello");
+let s_len1 = str::len(&s); // explicit reference
+let s_len2 = s.len();      // implicit reference
+assert_eq!(s_len1, s_len2);
+```
+
+Explicit dereferencing:
+```rs
+let mut x: Box<i32> = Box::new(1);
+let a: i32 = *x;         // *x reads the heap value, so a = 1
+*x += 1;                 // *x on the left-side modifies the heap value,
+                         //     so x points to the value 2
+
+let r1: &Box<i32> = &x;  // r1 points to x on the stack
+let b: i32 = **r1;       // two dereferences get us to the heap value
+```
+
 
 # Built-In Package
 ## Variables
@@ -54,7 +157,7 @@ let mut x = 5;
 - Constants are always immutable
 - The type of the value is required
 - Must be set only to a constant expression
-- Only they can be used in global scope (not `let` variables)
+- Only they can be used in global scope (not `letf` variables)
 - Naming convention: SNAKE_CASE
 ```rs
 const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
@@ -145,6 +248,46 @@ let second = a[1];
 
 #### Invalid Array Element Access
 - Index in bounds runtime check
+
+### The Slice Type
+- Reference a contiguous sequence of elements in a collection rather than the whole collection. Since a slice is a kind of reference, it does not have ownership.
+
+```rs
+let s: String = String::from("hello world");
+let hello: &str = &s[0..5];
+let world: &str = &s[6..11];
+```
+
+```rs
+let a: [i32; 5] = [1, 2, 3, 4, 5];
+let slice: &[i32] = &a[1..3];
+```
+
+#### Range Syntax
+- `let slice = &s[0..2];` is the same as `let slice = &s[..2];`
+- `let slice = &s[3..len];` is the same as `let slice = &s[3..];`
+- `let slice = &s[0..len];` is the same as `let slice = &s[..];`
+
+#### String Literals
+```rs
+let s = "Hello, world!";
+```
+The type of s here is &str: it’s a slice pointing to that specific point of the binary. This is also why string literals are immutable; &str is an immutable reference.
+
+#### Slice Type as Parameter Type
+```rs
+fn my_function(s: &str)
+```
+The above allows the same function on both `&String` and `&str` values
+```rs
+// `my_function` works on slices of `String`s, whether partial or whole
+my_function(&my_string[0..6]);
+my_function(&my_string[..]); 
+// `my_function` also works on references to `String`s, which are equivalent
+// to whole slices of `String`s
+my_function(&my_string);
+```
+
 
 ## Functions
 - Naming convention is *snake_case*
