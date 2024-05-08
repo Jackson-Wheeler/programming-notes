@@ -38,6 +38,26 @@ Check Documentation for Project & Dependencies:
 cargo doc --open
 ```
 
+## Managing Projects
+### Overview:
+* **Packages:** A Cargo feature that lets you build, test, and share crates
+* **Crates:** A tree of modules that produces a library or executable
+* **Modules** and **use:** Let you control the organization, scope, and
+  privacy of paths
+* **Paths:** A way of naming an item, such as a struct, function, or module
+
+### Packages and Crates
+*Crate*: the smallest amount of code that the Rust compiler considers at a time. Can contain modules, and the modules may be defined in other files that get compiled with the crate.
+
+*Binary crates*: programs you can compile to an executable tha tyou can run (must have `main`)
+
+*Library crates*: define functionality
+
+*Package*: A bundle of one or more crates that provides a set of functionality (contains `Cargo.toml` file)
+
+Root of project: Cargo follows convention that `src/main.rs` is the crate root of a binary crate with the same name as the package.
+  
+
 # Concepts
 ## Ownership
 - All heap data must be owned by exactly one variable
@@ -405,8 +425,491 @@ for number in (1..4).rev() {
 println!("LIFTOFF!!!");
 ```
 
+## Structs
+### Basics
+```rs
+struct User {
+    active: bool,
+    username: String,
+    email: String,
+    sign_in_count: u64,
+}
+
+fn main() {
+    let mut user1 = User {
+        active: true,
+        username: String::from("someusername123"),
+        email: String::from("someone@example.com"),
+        sign_in_count: 1,
+    };
+
+    user1.email = String::from("anotheremail@example.com");
+}
+```
+
+### Field Init Shorthand
+```rs
+fn build_user(email: String, username: String) -> User {
+    User {
+        active: true,
+        username,
+        email,
+        sign_in_count: 1,
+    }
+}
+```
+
+### Struct Update Syntax
+Shorthand for assigning one struct to another, while updating variables.
+```rs
+fn main() {
+    // --snip--
+
+    let user2 = User {
+        email: String::from("another@example.com"),
+        ..user1
+    };
+}
+```
+
+Struct update syntax uses `=` like an assignment. So it *moves* any field data that is on the heap, and *copies* field data that is on the stack. Thus it is possible that the original struct is no longer valid.
+
+### Tuple Structs
+Struct with no names to the fields. Useful when wanting to create a distinct type for a tuple.
+```rs
+struct Color(i32, i32, i32);
+struct Point(i32, i32, i32);
+
+fn main() {
+    let black = Color(0, 0, 0);
+    let origin = Point(0, 0, 0);
+}
+```
+
+### Unit-Like Structs
+Useful when you need to implement a trait on some type but don't have any data that you want to store in the type itself.
+```rs
+struct AlwaysEqual;
+
+fn main() {
+    let subject = AlwaysEqual;
+}
+```
+
+### Debug Printing
+Adding `#[derive(Debug)]` above struct definition allows debug printing of your struct.
+```rs
+println!("rect1 is {:?}", rect1); // regular debug print of struct
+println!("rect1 is {:#?}", rect1); // prettier debug print of struct
+```
+#### Debug Macro
+```rs
+dbg!(&rect1);
+```
+
+### Methods
+- their first parameter is always `self`, which represents the instance of the struct the method is being called on
+```rs
+struct Rectangle {
+    width: u32,
+    height: u32,
+}
+
+impl Rectangle {
+    fn area(&self) -> u32 {
+        self.width * self.height
+    }
+}
+```
+Called with dot operator on Rectangle instance: `.area()`
+
+### Associated Functions
+Does not take the `self` parameter. Called with `::` syntax.
+```rs
+impl Rectangle {
+    fn square(size: u32) -> Self {
+        Self {
+            width: size,
+            height: size,
+        }
+    }
+}
+```
+Call: `let sq = Rectangle::square(3)`
+
+## Enums and Pattern Matching
+### Basics
+```rs
+enum IpAddrKind {
+    V4,
+    V6,
+}
+```
+```rs
+let four: IpAddrKind = IpAddrKind::V4;
+let six: IpAddrKind = IpAddrKind::V6;
+```
+Both of the above are of type `IpAddrKind`
+
+Attach data to each variant of the enum directly:
+```rs
+enum IpAddr {
+    V4(u8, u8, u8, u8),
+    V6(String),
+}
+
+let home = IpAddr::V4(127, 0, 0, 1);
+let loopback = IpAddr::V6(String::from("::1"));
+```
+
+Attach structs to each variant of the enum:
+```rs
+struct Ipv4Addr {
+    // --snip--
+}
+
+struct Ipv6Addr {
+    // --snip--
+}
+
+enum IpAddr {
+    V4(Ipv4Addr),
+    V6(Ipv6Addr),
+}
+```
+
+Another Example:
+```rs
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 }, // named fields, like a struct
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+```
+
+Use `impl` with enums:
+```rs
+impl Message {
+    fn call(&self) {
+        // method body would be defined here
+    }
+}
+
+let m = Message::Write(String::from("hello"));
+m.call();
+```
+
+### Option Enum
+```rs
+enum Option<T> {
+    None,
+    Some(T),
+}
+``` 
+
+### `match` Control Flow
+```rs
+enum Coin {
+    Penny,
+    Nickel,
+    Dime,
+    Quarter,
+}
+
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => {
+            println!("Lucky penny!");
+            1
+        }
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter => 25,
+    }
+}
+```
+
+Accessing a value:
+```rs
+fn value_in_cents(coin: Coin) -> u8 {
+    match coin {
+        Coin::Penny => 1,
+        Coin::Nickel => 5,
+        Coin::Dime => 10,
+        Coin::Quarter(state) => {
+            println!("State quarter from {:?}!", state);
+            25
+        }
+    }
+}
+```
+
+#### Matching with `Option<T>`
+```rs
+fn plus_one(x: Option<i32>) -> Option<i32> {
+    match x {
+        None => None,
+        Some(i) => Some(i + 1),
+    }
+}
+```
+
+#### Catch-all Patterns
+Cover all possible values:
+```rs
+let dice_roll = 9;
+match dice_roll {
+    3 => add_fancy_hat(),
+    7 => remove_fancy_hat(),
+    other => move_player(other), // catch all pattern
+}
+```
+
+Use `_` to catch-all, but not use the value
+```rs
+let dice_roll = 9;
+match dice_roll {
+    3 => add_fancy_hat(),
+    7 => remove_fancy_hat(),
+    _ => (), // do nothing - empty tuple type (unit value)
+}
+```
+
+### `if` `let`
+Less verbose way to handle values that match one pattern while ignoring the rest.
+
+Instead of:
+```rs
+let config_max = Some(3u8);
+match config_max {
+    Some(max) => println!("The maximum is configured to be {}", max),
+    _ => (),
+}
+```
+
+Do:
+```rs
+let config_max = Some(3u8);
+if let Some(max) = config_max {
+    println!("The maximum is configured to be {}", max);
+}
+```
+
+Can also use `else`:
+```rs
+let mut count = 0;
+if let Coin::Quarter(state) = coin {
+    println!("State quarter from {:?}!", state);
+} else {
+    count += 1;
+}
+```
+
+# Standard Library
+## Collections
+- The data is stored on the heap, unlike the built-in array and tuple types
+
+### Vectors
+```rs
+let v: Vec<i32> = Vec::new();
+let v = vec![1, 2, 3]; // using `vec!` macro
+```
+```rs
+v.push(5);
+```
+```rs
+let v = vec![1, 2, 3, 4, 5];
+
+let third: &i32 = &v[2];
+println!("The third element is {third}");
+
+let third: Option<&i32> = v.get(2);
+match third {
+    Some(third) => println!("The third element is {third}"),
+    None => println!("There is no third element."),
+}
+```
+
+#### Iterating over Vector
+```rs
+let v = vec![100, 32, 57];
+for elem in &v {
+    println!("{elem}");
+}
+```
+Modifying elements:
+```rs
+let mut v = vec![100, 32, 57];
+for elem in &mut v {
+    *elem += 50;
+}
+```
+
+#### Holding Multiple Types
+'Mask' each type with Enum
+```rs
+enum SpreadsheetCell {
+    Int(i32),
+    Float(f64),
+    Text(String),
+}
+
+let row = vec![
+    SpreadsheetCell::Int(3),
+    SpreadsheetCell::Text(String::from("blue")),
+    SpreadsheetCell::Float(10.12),
+];
+```
+
+Alternative: use the trait object to make this work
+
+### Strings
+#### Creating
+```rs
+let mut s = String::new();
+```
+`to_string` method:
+```rs
+let data: &str = "initial contents";
+let s: String = data.to_string();
+// the method also works on a literal directly:
+let s: String = "initial contents".to_string();
+```
+`String::from` method:
+```rs
+let s = String::from("initial contents");
+```
+
+#### Updating
+Appending:
+```rs
+let mut s = String::from("foo");
+s.push_str("bar");
+s.push('s'); // for single char
+// s = "foobars"
+```
+Concatenation:
+```rs
+let s1 = String::from("Hello, ");
+let s2 = String::from("world!");
+let s3 = s1 + &s2; // note s1 has been moved here and can no longer be used
+```
+```rs
+let s1 = String::from("tic");
+let s2 = String::from("tac");
+let s3 = String::from("toe");
+
+let s = format!("{s1}-{s2}-{s3}");
+```
+
+#### Slicing Strings
+Return the first four bytes of the string
+```rs
+let hello = "Здравствуйте";
+let s = &hello[0..4];
+```
+
+Note: if make a slice resulting in invalid characters -> program panic
+
+#### Iterating over Strings
+Iterate over characters:
+```rs
+for c in "Зд".chars() {
+    println!("{c}");
+}
+// З
+// д
+```
+
+Iterate over bytes:
+```rs
+for b in "Зд".bytes() {
+    println!("{b}");
+}
+// 208
+// 151
+// 208
+// 180
+```
+
+### Hash Maps
+#### Including
+```rs
+use std::collections::HashMap;
+```
+
+#### Creating
+```rs
+let mut scores = HashMap::new();
+```
+
+#### Inserting
+```rs
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Yellow"), 50);
+```
+
+#### Accessing
+```rs
+let team_name = String::from("Blue");
+let score = scores.get(&team_name).copied().unwrap_or(0);
+```
+This program handles the `Option` by calling `copied` to get an `Option<i32>` rather than an `Option<&i32>`, then `unwrap_or` to set `score` to zero if `scores` doesn’t have an entry for the key.
+
+Iterating:
+```rs
+for (key, value) in &scores {
+    println!("{key}: {value}");
+}
+```
+
+#### Ownership
+For types that implement the `Copy` trait, like `i32`, the values are copied
+into the hash map. For owned values like `String`, the values will be moved and
+the hash map will be the owner of those values, as demonstrated in Listing 8-22.
+```rs
+let field_name = String::from("Favorite color");
+let field_value = String::from("Blue");
+let mut map = HashMap::new();
+map.insert(field_name, field_value);
+// field_name and field_value are invalid at this point
+```
+
+If we insert references to values into the hash map, the values won’t be moved
+into the hash map. The values that the references point to must be valid for at
+least as long as the hash map is valid.
+
+#### Updating
+Overwrite:
+```rs
+let mut scores = HashMap::new();
+scores.insert(String::from("Blue"), 10);
+scores.insert(String::from("Blue"), 25);
+```
+
+Add if not present:
+```rs
+let mut scores = HashMap::new();
+scores.insert(String::from("Blue"), 10);
+scores.entry(String::from("Yellow")).or_insert(50);
+scores.entry(String::from("Blue")).or_insert(50);
+```
+The `or_insert` method on `Entry` is defined to return a mutable reference to
+the value for the corresponding `Entry` key if that key exists, and if not, it
+inserts the parameter as the new value for this key and returns a mutable
+reference to the new value.
+
+Updating:
+```rs
+let text = "hello world wonderful world";
+let mut map = HashMap::new();
+for word: &str in text.split_whitespace() {
+    let count: &mut i32 = map.entry(word).or_insert(0);
+    *count += 1;
+}
+```
 
 
-# Standard Library Package
 
 # Other Packages

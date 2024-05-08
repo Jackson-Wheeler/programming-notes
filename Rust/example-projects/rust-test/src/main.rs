@@ -1,6 +1,14 @@
 fn main() {
-    let a = [1, 2, 3, 4, 5];
-    let slice = &a[1..3];
+    use std::collections::HashMap;
 
-    assert_eq!(slice, &[2, 3]);
+    let text = "hello world wonderful world";
+
+    let mut map = HashMap::new();
+
+    for word in text.split_whitespace() {
+        let count = map.entry(word).or_insert(0);
+        *count += 1;
+    }
+
+    println!("{:?}", map);
 }
