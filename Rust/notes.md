@@ -706,6 +706,364 @@ if let Coin::Quarter(state) = coin {
 }
 ```
 
+## Error Handling
+### Panic
+```rs
+panic!("crash and burn");
+```
+
+### Recoverable Errors with `Result`
+```rs
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+Using `match` statement:
+```rs
+use std::fs::File;
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => panic!("Problem opening the file: {:?}", error),
+    };
+}
+```
+
+#### Matching on Different Errors
+```rs
+use std::fs::File;
+use std::io::ErrorKind;
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,
+                Err(e) => panic!("Problem creating the file: {:?}", e),
+            },
+            other_error => {
+                panic!("Problem opening the file: {:?}", other_error);
+            }
+        },
+    };
+}
+```
+
+#### `unwrap`
+If the `Result` value is the `Ok` variant, `unwrap` will return
+the value inside the `Ok`. If the `Result` is the `Err` variant, `unwrap` will
+call the `panic!` macro for us. Here is an example of `unwrap` in action:
+```rs
+let greeting_file = File::open("hello.txt").unwrap();
+```
+
+#### `except`
+Similarly, the `expect` method lets us also choose the `panic!` error message.
+```rs
+let greeting_file = File::open("hello.txt")
+    .expect("hello.txt should be included in this project");
+```
+
+### Propogating Errors
+Return a `Result`:
+```rs
+use std::fs::File;
+use std::io::{self, Read};
+fn read_username_from_file() -> Result<String, io::Error> {
+    let username_file_result = File::open("hello.txt");
+    let mut username_file = match username_file_result {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+    let mut username = String::new();
+    match username_file.read_to_string(&mut username) {
+        Ok(_) => Ok(username),
+        Err(e) => Err(e),
+    }
+}
+```
+
+Using the question mark operator:
+```rs
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username_file = File::open("hello.txt")?;
+    let mut username = String::new();
+    username_file.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+If the value of the `Result` is an `Ok`, the value inside the `Ok` will
+get returned from this expression, and the program will continue. If the value
+is an `Err`, the `Err` will be returned from the whole function as if we had
+used the `return` keyword so the error value gets propagated to the calling
+code.
+
+There is a difference between what the `match` expression from Listing 9-6 does
+and what the `?` operator does: error values that have the `?` operator called
+on them go through the `from` function, defined in the `From` trait in the
+standard library, which is used to convert values from one type into another.
+When the `?` operator calls the `from` function, the error type received is
+converted into the error type defined in the return type of the current
+function. This is useful when a function returns one error type to represent
+all the ways a function might fail, even if parts might fail for many different
+reasons.
+
+Even Shorter Code:
+```rs
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username = String::new();
+    File::open("hello.txt")?.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+
+#### More on the `?` operator
+The `?` operator can only be used in functions whose return type is compatible
+with the value the `?` is used on. This is because the `?` operator is defined
+to perform an early return of a value out of the function.
+
+The error message also mentioned that `?` can be used with `Option<T>` values
+as well.
+
+### Custom Types for Validation
+Custom type for integers from 1 to 100:
+```rs
+pub struct Guess {
+    value: i32,
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {}.", value);
+        }
+
+        Guess { value }
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+```
+
+## Generic Types, Traits, and Lifetimes
+### Generic Data Types
+#### Functions
+```rs
+fn largest<T>(list: &[T]) -> &T {
+```
+
+#### In Struct
+```rs
+struct Point<T> {
+    x: T,
+    y: T,
+}
+```
+
+#### In enums
+```rs
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+#### In Methods
+```rs
+struct Point<T> {
+    x: T,
+    y: T,
+}
+
+impl<T> Point<T> {
+    fn x(&self) -> &T {
+        &self.x
+    }
+}
+```
+
+### Traits
+#### Definition
+```rs
+pub trait Summary {
+    fn summarize(&self) -> String;
+}
+```
+
+#### Implementation
+```rs
+pub struct Tweet {
+    pub username: String,
+    pub content: String,
+    pub reply: bool,
+    pub retweet: bool,
+}
+
+impl Summary for Tweet {
+    fn summarize(&self) -> String {
+        format!("{}: {}", self.username, self.content)
+    }
+}
+```
+
+#### Calling Implementation
+```rs
+use aggregator::{Summary, Tweet};
+fn main() {
+    let tweet = Tweet {
+        username: String::from("horse_ebooks"),
+        content: String::from(
+            "of course, as you probably already know, people",
+        ),
+        reply: false,
+        retweet: false,
+    };
+    println!("1 new tweet: {}", tweet.summarize());
+}
+```
+
+#### Default Implementations
+```rs
+pub trait Summary {
+    fn summarize(&self) -> String {
+        String::from("(Read more...)")
+    }
+}
+
+impl Summary for NewsArticle {}
+```
+
+#### Traits as Parameters
+```rs
+pub fn notify<T: Summary>(item: &T) {
+    println!("Breaking news! {}", item.summarize());
+}
+```
+This parameter accepts any type that implements the specified trait.
+
+Shorthand form:
+```rs
+pub fn notify(item: &impl Summary) {
+```
+
+
+These two parameters can have different type that each implement `Summary`:
+```rs
+pub fn notify(item1: &impl Summary, item2: &impl Summary) {
+```
+
+These two parameters must have the same type:
+```rs
+pub fn notify<T: Summary>(item1: &T, item2: &T) {
+```
+
+##### Multiple Trait Bounds
+```rs
+pub fn notify<T: Summary + Display>(item: &T) {
+```
+```rs
+pub fn notify(item: &(impl Summary + Display)) {
+```
+
+##### `where` Clause
+Instead of:
+```rs
+fn some_function<T: Display + Clone, U: Clone + Debug>(t: &T, u: &U) -> i32 {
+```
+Have:
+```rs
+fn some_function<T, U>(t: &T, u: &U) -> i32
+where
+    T: Display + Clone,
+    U: Clone + Debug,
+{
+```
+
+#### Return Types
+```rs
+fn returns_summarizable() -> impl Summary {
+```
+
+### Lifetimes
+Ensure that references are valid as long as we need them to be.
+
+```rs
+&'a i32     // a reference with an explicit lifetime
+```
+
+Show that the returned reference will be valid as long as both the parameters are valid:
+```rs
+fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
+    if x.len() > y.len() {
+        x
+    } else {
+        y
+    }
+}
+```
+
+```rs
+fn longest<'a>(x: &'a str, y: &str) -> &'a str {
+    x
+}
+```
+When returning a reference from a function, the lifetime parameter for the return type needs to match the lifetime parameter for one of the parameters.
+
+#### In Structs
+```rs
+struct ImportantExcerpt<'a> {
+    part: &'a str,
+}
+
+fn main() {
+    let novel = String::from("Call me Ishmael. Some years ago...");
+    let first_sentence = novel.split('.').next().expect("Could not find a '.'");
+    let i = ImportantExcerpt {
+        part: first_sentence,
+    };
+}
+```
+The instance of `ImportantExcerpt` can't outlive the reference it holds in its `part` field
+
+#### Lifetiime Elision
+Full lifetime annotation:
+```rs
+fn first_word<'a>(s: &'a str) -> &'a str {
+```
+
+Shortcut for this case:
+```rs
+fn first_word(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    for (i, &item) in bytes.iter().enumerate() {
+        if item == b' ' {
+            return &s[0..i];
+        }
+    }
+    &s[..]
+}
+```
+
+#### In Methods
+```rs
+impl<'a> ImportantExcerpt<'a> { // lifetime annotations required if they appear in struct definition
+```
+
+#### The Static Lifetime
+`'static`: the affected reference *can* live for the entire duration of the program. All string literals have the `'static` lifetime. 
+```rs
+let s: &'static str = "I have a static lifetime.";
+```
+The text of this string is stored directly in the program's binary, which is always available.
+
+
+
 # Standard Library
 ## Collections
 - The data is stored on the heap, unlike the built-in array and tuple types
