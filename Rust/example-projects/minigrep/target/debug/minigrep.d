@@ -1,0 +1,1 @@
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/minigrep/target/debug/minigrep: /Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/minigrep/src/lib.rs /Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/minigrep/src/main.rs

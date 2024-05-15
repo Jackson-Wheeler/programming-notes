@@ -57,6 +57,154 @@ cargo doc --open
 
 Root of project: Cargo follows convention that `src/main.rs` is the crate root of a binary crate with the same name as the package.
   
+## Writing Automated Tests
+To change a function into a test function, add `#[test]` on the line before `fn`
+
+### Run Tests
+```sh
+cargo test
+```
+
+### Writing Tests
+#### Asserts
+```rs
+assert!(bool)
+assert_eq!(exp1, exp2) // exps must implement `PartialEq` and `Debug` traits
+assert_ne!(exp1, exp2) // exps must implement `PartialEq` and `Debug` traits
+```
+
+When asserting equal structs and enums I define myself, need to implement `PartialEq` to assert equality of those types & `Debug` to print the values when the assertion fails. Usuall can be accomplished by adding `#[derive(PartialEq, Debug)]` annotation to the struct or enum definition.
+
+#### Error Messages in Asserts
+Add arguments to assert macros to pass format strings as custom messages:
+```rs
+assert!(
+    result.contains("Carol"),
+    "Greeting did not contain name, value was `{}`",
+    result
+);
+```
+
+#### Checking for Panics
+use `should_panic` to check for panics.
+```rs
+#[test]
+#[should_panic(expected = "less than or equal to 100")]
+fn greater_than_100() {
+    Guess::new(200);
+}
+```
+
+Adding the `expected` in the parenthesis ensure the given text is found in the panic message.
+
+#### Using `Results<T, E>` in Tests
+```rs
+#[test]
+fn it_works() -> Result<(), String> {
+    if 2 + 2 == 4 {
+        Ok(())
+    } else {
+        Err(String::from("two plus two does not equal four"))
+    }
+}
+```
+
+Allows you to use the question mark operator in the body of tests, which can be a convenient way to write tests that should fail if any operation within them returns an `Err` variant.
+
+#### Assert Err
+To assert that an operation returns an `Err`: 
+```rs
+assert!(value.is_err())
+```
+
+### Running Tests
+#### Help
+```sh
+cargo test --help # display the options you can use with `cargo test`
+cargo test -- --help # display the options you can use after the seperator (arguments to the test binary)
+```
+
+#### Running Tests Consecutively
+```sh
+cargo test -- --test-threads=1
+```
+
+#### Show Output of Passing Tests
+```sh
+cargo test -- --show-output
+```
+
+#### Run Subset of Tests by Name
+```sh
+cargo test substring // run every test containing `substring`
+```
+Run all the tests in a module by filtering on the module's name.
+
+#### Ignoring Tests
+```rs
+#[test]
+#[ignore] // add this line
+fn expensive_test() {}
+```
+
+Run only the ignored test:
+```sh
+cargo test -- --ignored
+```
+
+Run all tests, ignored or not:
+```sh
+cargo test -- --include-ignored
+```
+
+#### Running Integration Tests
+```sh
+cargo test --test file_name # run all tests in given integration test file
+```
+
+### Test Organization
+*Unit tests*: small and more focused, testing one module in isolation at a time, and can test private interfaces
+
+*Integration tests*: entirely external to your library and use your code in the same way any other external code would, using only the public interface and potentially exercising multiple modules per test
+
+#### Unit Test
+Put unit tests in the *src* directory in each file with the code that they're testing. Create a module named `tests` in each file to containt the test functions (annotation: `#[cfg(test)]`).
+
+Private functions *can* be tested in Rust.
+
+#### Integration Tests
+Create `tests` directory in project's top level for integration test files (Each file in `tests` directory is a seperate crate)
+```rs
+use adder;
+
+#[test]
+fn it_adds_two() {
+    assert_eq!(4, adder::add_two(2));
+}
+```
+
+Cannot create integration tests for binary crates.
+
+#### Submodules in `tests`
+Add a submodule (directory) to `tests` in order to provide shared code.
+
+Example (adding `tests/common/mod.rs`):
+```rs
+pub fn setup() {
+    // setup code specific to your library's tests would go here
+}
+```
+Calling from `tests/integration_test.rs`:
+```rs
+use adder;
+mod common;
+
+#[test]
+fn it_adds_two() {
+    common::setup();
+    assert_eq!(4, adder::add_two(2));
+}
+```
 
 # Concepts
 ## Ownership
