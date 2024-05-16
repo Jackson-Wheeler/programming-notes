@@ -39,7 +39,7 @@ cargo doc --open
 ```
 
 ## Managing Projects
-### Overview:
+### Overview
 * **Packages:** A Cargo feature that lets you build, test, and share crates
 * **Crates:** A tree of modules that produces a library or executable
 * **Modules** and **use:** Let you control the organization, scope, and
@@ -56,6 +56,106 @@ cargo doc --open
 *Package*: A bundle of one or more crates that provides a set of functionality (contains `Cargo.toml` file)
 
 Root of project: Cargo follows convention that `src/main.rs` is the crate root of a binary crate with the same name as the package.
+
+### Documentation
+Use `///` for *documentation comments*. Only for documenting the public API items to tell how the API should be *used* (not how it is implemented). Supports Markdown notation.
+
+Method example:
+```rs
+/// Adds one to the number given.
+///
+/// # Examples
+///
+/// ```
+/// let arg = 5;
+/// let answer = my_crate::add_one(arg);
+///
+/// assert_eq!(6, answer);
+/// ```
+pub fn add_one(x: i32) -> i32 {
+    x + 1
+}
+```
+
+#### Generate Documentation
+```sh
+cargo doc
+cargo doc --open // opens the results in a web browser
+```
+Generates documentation for current crate (and all crate's dependencies)
+
+#### Documentation Comment Tests
+`cargo test` automatically runs the code examples included in documentation
+
+#### Commenting Contained Items
+`//!` adds documentation to the item that contains the comments rather than to the items following the comments.
+
+Example in `src/lib.rs` file (crate root):
+```rs
+//! # My Crate
+//!
+//! `my_crate` is a collection of utilities to make performing certain
+//! calculations more convenient.
+
+/// Adds one to the number given.
+// --snip--
+```
+
+### Exporting Public API with `pub use`
+Allows the organization of your code to be different than the hiearchy when exporting the public API.
+
+Example:
+```rs
+// the below three statements put these all at the top level for public use (Re-exports)
+pub use self::kinds::PrimaryColor;
+pub use self::kinds::SecondaryColor;
+pub use self::utils::mix;
+
+pub mod kinds {
+    /// The primary colors according to the RYB color model.
+    pub enum PrimaryColor {
+        Red,
+        Yellow,
+        Blue,
+    }
+
+    /// The secondary colors according to the RYB color model.
+    pub enum SecondaryColor {
+        Orange,
+        Green,
+        Purple,
+    }
+}
+
+pub mod utils {
+    use crate::kinds::*;
+
+    /// Combines two primary colors in equal amounts to create
+    /// a secondary color.
+    pub fn mix(c1: PrimaryColor, c2: PrimaryColor) -> SecondaryColor {
+        // --snip--
+    }
+}
+```
+
+### Cargo Workspaces
+Helps manage multiple related packages that are developed in tandem.
+
+A *workspace* is a set of packages that share the same *Cargo.lock* and output directory.
+
+#### Set up
+https://doc.rust-lang.org/book/ch14-03-cargo-workspaces.html
+
+#### Testing
+Run tests for a specific crate:
+```sh
+cargo test -p crate_name
+```
+
+### Installing Binaries with `cargo install`
+Allows you to install and use binary crates locally (on the command line).
+
+
   
 ## Writing Automated Tests
 To change a function into a test function, add `#[test]` on the line before `fn`
@@ -1209,6 +1309,115 @@ impl<'a> ImportantExcerpt<'a> { // lifetime annotations required if they appear 
 let s: &'static str = "I have a static lifetime.";
 ```
 The text of this string is stored directly in the program's binary, which is always available.
+
+## Iterators and Closures
+### Closures
+Examples:
+```rs
+user_preference.unwrap_or_else(|| self.most_stocked())
+```
+```rs
+let expensive_closure = |num: u32| -> u32 {
+    println!("calculating slowly...");
+    thread::sleep(Duration::from_secs(2));
+    num
+};
+```
+```rs
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+let add_one_v3 = |x|             { x + 1 };
+let add_one_v4 = |x|               x + 1  ;
+```
+
+#### Assigning Types
+If necessary compiler will infer closure types, often when the closue is first used. 
+```rs
+let example_closure = |x| x;
+let s = example_closure(String::from("hello")); 
+let n = example_closure(5); // this will cause COMPILE ERROR - changing type of closur
+```
+
+#### Capturing References or Moving Ownership
+Immutable reference in closure:
+```rs
+let list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+let only_borrows = || println!("From closure: {:?}", list); // closure: immutable reference
+
+println!("Before calling closure: {:?}", list);
+only_borrows();
+println!("After calling closure: {:?}", list);
+```
+
+Mutable reference in closure:
+```rs
+let mut list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+let mut borrows_mutably = || list.push(7); // closure: mutable reference
+// immutable reference not allowed, due to mutable reference in use
+borrows_mutably();
+println!("After calling closure: {:?}", list); // mutable reference no longer in use
+```
+
+Force closure to tak ownership of the values it uses in the environment, use the `move` keyword before the parameter list. 
+```rs
+let list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+thread::spawn(move || println!("From thread: {:?}", list)) // move ownership of `list` to new thread
+    .join()
+    .unwrap();
+```
+
+#### Closure Traits
+Closures will automatically implement one, two, or all three of these `Fn` traits, in an additive fashion, depending on how the closure’s body handles the values:
+1. `FnOnce` applies to closures that can be called once. All closures implement
+   at least this trait, because all closures can be called. A closure that
+   moves captured values out of its body will only implement `FnOnce` and none
+   of the other `Fn` traits, because it can only be called once.
+2. `FnMut` applies to closures that don’t move captured values out of their
+   body, but that might mutate the captured values. These closures can be
+   called more than once.
+3. `Fn` applies to closures that don’t move captured values out of their body
+   and that don’t mutate captured values, as well as closures that capture
+   nothing from their environment. These closures can be called more than once
+   without mutating their environment, which is important in cases such as
+   calling a closure multiple times concurrently.
+
+### Iterators
+#### `Iterator` Trait
+All iterators implement the `Iterator` trait
+```rs
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+    // methods with default implementations elided
+}
+```
+
+#### Get iterator
+```rs
+let mut v1_iter = v1.iter();
+assert_eq!(v1_iter.next(), Some(&1));
+```
+`iter()`: returns immutable references
+`into_iter()`: returns owned values
+`iter_mut()`: returns mutable references
+
+#### Methods that Produce Other Iterators
+`collect()` method consumes the iterator (returned by `map()`) and collects the resulting values into a collection data type.
+```rs
+let v1: Vec<i32> = vec![1, 2, 3];
+let v2: Vec<_> = v1.iter().map(|x| x + 1).collect();
+```
+
+#### Filter
+```rs
+shoes.into_iter().filter(|s| s.size == shoe_size).collect()
+```
+
 
 
 

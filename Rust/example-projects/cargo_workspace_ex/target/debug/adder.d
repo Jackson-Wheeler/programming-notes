@@ -1,0 +1,1 @@
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/cargo_workspace_ex/target/debug/adder: /Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/cargo_workspace_ex/add_one/src/lib.rs /Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/cargo_workspace_ex/adder/src/main.rs

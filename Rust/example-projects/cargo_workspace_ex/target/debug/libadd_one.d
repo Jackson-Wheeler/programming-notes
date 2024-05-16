@@ -1,0 +1,1 @@
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/cargo_workspace_ex/target/debug/libadd_one.rlib: /Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/cargo_workspace_ex/add_one/src/lib.rs
