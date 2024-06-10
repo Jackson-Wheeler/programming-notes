@@ -411,6 +411,279 @@ let b: i32 = **r1;       // two dereferences get us to the heap value
 ```
 
 
+## Concurrency
+### Threads for Simultaneous Code
+Rust uses 1:1 model of thread implementation: a program uses one OS thread per one language thread.
+
+#### Creating New Thread
+Use `thread::spawn` function and pass it a closure (the code we want to run in the new thread)
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..5 {
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+```
+Note: when the main thread of a Rust program completes, al spawned threads are shut down.
+
+#### Waitting for all Threads to Finish
+Use `join` Handles to wait for all threads to finish.
+
+`thread:spawn` returns an owned `JoinHandle`, on which that the `join` method can be called.
+`join` method will wait for it's thread to finish.
+```rs
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let handle = thread::spawn(|| {
+        for i in 1..10 {
+            println!("hi number {} from the spawned thread!", i);
+            thread::sleep(Duration::from_millis(1));
+        }
+    });
+
+    for i in 1..5 {
+        println!("hi number {} from the main thread!", i);
+        thread::sleep(Duration::from_millis(1));
+    }
+
+    handle.join().unwrap(); // blocking call
+}
+```
+
+#### Using `move` Closures with Threads
+Use `move` keyword with closures passed to `thread::spawn` in order to force the closure to take ownership of the values it uses from the environment.
+
+Problem (compile error), where `v` is only borrowed on not moved to the new thread:
+```rs
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    let handle = thread::spawn(|| {
+        println!("Here's a vector: {:?}", v);
+    });
+
+    drop(v); // oh no!
+
+    handle.join().unwrap();
+}
+```
+
+Solution is to force the closure to take ownership of the values it's using rather than just borrowing it:
+```rs
+use std::thread;
+
+fn main() {
+    let v = vec![1, 2, 3];
+
+    let handle = thread::spawn(move || {
+        println!("Here's a vector: {:?}", v);
+    });
+
+    handle.join().unwrap();
+}
+```
+
+### Message Passing to Transfer Data Between Threads
+Rust provides an implementation of *channels*.
+* A *channel* is closed if either the transmitter or receiver half is dropped.
+* Channels can have multiple *sending* ends, but only one *receiving* end.
+
+#### Create new Channel
+Use `mpsc::channel` function to create new channel (`mpsc` stand for *multiple producer, single consumer*)
+```rs
+use std::sync::mpsc;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+}
+```
+
+#### Transmitting
+```rs
+use std::sync::mpsc;
+use std::thread;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let val = String::from("hi");
+        tx.send(val).unwrap();
+    });
+
+    let received = rx.recv().unwrap();
+    println!("Got: {}", received);
+}
+```
+* `recv`: Blocking call to receive a value
+* `try_recv`: Non-blocking call that returns immediately
+
+#### Ownership Transference
+`send` function takes ownership of its parameter, then the receiver takes ownership of it.
+
+#### Sending Multiple Values
+Can iterate over receiver to get messages:
+```rs
+use std::sync::mpsc;
+use std::thread;
+use std::time::Duration;
+
+fn main() {
+    let (tx, rx) = mpsc::channel();
+
+    thread::spawn(move || {
+        let vals = vec![
+            String::from("hi"),
+            String::from("from"),
+            String::from("the"),
+            String::from("thread"),
+        ];
+
+        for val in vals {
+            tx.send(val).unwrap();
+            thread::sleep(Duration::from_secs(1));
+        }
+    });
+
+    for received in rx {
+        println!("Got: {}", received);
+    }
+}
+```
+
+#### Creating Multiple Producers
+Can create multiple producers by cloning the transmitter.
+```rs
+let (tx, rx) = mpsc::channel();
+
+let tx1 = tx.clone();
+thread::spawn(move || {
+    let vals = vec![
+        String::from("hi"),
+        String::from("from"),
+        String::from("the"),
+        String::from("thread"),
+    ];
+
+    for val in vals {
+        tx1.send(val).unwrap();
+        thread::sleep(Duration::from_secs(1));
+    }
+});
+
+thread::spawn(move || {
+    let vals = vec![
+        String::from("more"),
+        String::from("messages"),
+        String::from("for"),
+        String::from("you"),
+    ];
+
+    for val in vals {
+        tx.send(val).unwrap();
+        thread::sleep(Duration::from_secs(1));
+    }
+});
+
+for received in rx {
+    println!("Got: {}", received);
+}
+```
+
+### Shared-State Concurrency
+Multiple threads access the same shared data.
+
+#### Mutexes to Access Data
+*Mutex* allows only one thread to access some data at any given time. *Lock* is the data structure that is a part of the mutex that keeps track of who currently has exclusive access to the data.
+
+Use Rules:
+* Attempt to acquire the lock before usage
+* Unlock the data after use
+
+##### `Mutex<T>` API
+```rs
+use std::sync::Mutex;
+
+fn main() {
+    let m = Mutex::new(5);
+
+    {
+        let mut num = m.lock().unwrap(); // blocking call
+        *num = 6;
+    }
+
+    println!("m = {:?}", m);
+}
+```
+`lock` method used to *acquire* the lock, a blocking call. Fails if another thread holding the lock panics. Returns `MutexGuard`, a smart pointer that points to the data (mutalbe reference). This smart pointer releases the lock automaticaly when a `MutexGuard` goes out of scope.
+
+#### Sharing a `Mutex<T>` Between Threads - Atomic Reference Counting with `Arc<T>`
+Use Atomic Reference Counting with `Arc<T>`, which is like `Rc<T>` but safe to use in concurrent situations (*atomically reference counted*).
+
+```rs
+use std::sync::{Arc, Mutex};
+use std::thread;
+
+fn main() {
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..10 {
+        let counter = Arc::clone(&counter);
+        let handle = thread::spawn(move || {
+            let mut num = counter.lock().unwrap();
+
+            *num += 1;
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    println!("Result: {}", *counter.lock().unwrap());
+}
+```
+
+Note: for simple numerical operations, there are types simpler than `Mutex<T>`.
+
+
+### Extensible Concurrency with `Sync` and `Send` Traits
+#### `Send` Trait
+Allows transference of ownership between threads. 
+
+`Send` (`std::marker`) trait indicates that ownership of values of the type implementing `Send` can be trasnferred between threads.
+
+Almost all primitive types are `Send`, aside from raw pointers.
+
+#### `Sync` Trait
+Allows access from Multiple Threads. 
+
+The `Sync` (`std::marker`) trait indicates that it is safe for the type implementing `Sync` to be referenced from multiple threads. In other words, any type `T` is `Sync` if `&T` (an immutable reference to `T`) is `Send`, meaning the reference can be sent safely to another thread.
+
+The smart pointer `Mutex<T>` is `Sync` and can be used to share access with multiple threads.
+
+#### Implenting `Send` and `Sync`
+Because types that are made up of `Send` and `Sync` traits are automatically also `Send` and `Sync`, we don't have to implement those traits manually.
+
+
+
 # Built-In Package
 ## Variables
 ### Mutability
@@ -1418,7 +1691,127 @@ let v2: Vec<_> = v1.iter().map(|x| x + 1).collect();
 shoes.into_iter().filter(|s| s.size == shoe_size).collect()
 ```
 
+## Smart Pointers
+Provide functionality beyond what references provide. Allows you to have multiple owners.
 
+In many cases smart pointers *own* the data they point to.
+
+`String` and `Vec<T>` are smart pointers.
+
+Usuall implemnted using structs, implementing the `Deref` and `Drop` traits.
+
+### Using `Box<T>` to Point to Data on the Heap
+Allow you to store data on the heap rather than the stack.
+
+Use cases:
+- When you have a type whose size can't be known at compile time and you want to use a value of that type in a context that requires an exact size
+- When you have a large amount of data and you want to transfer ownership but ensure the data won't be copied when you do so
+- When you want to own a value and you car only that it's a type that implements a particular trait rather than being of a specific type
+
+#### Syntax
+```rs
+let b = Box::new(5);
+```
+
+#### Enabling Recursive Types with Boxes
+```rs
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+use crate::List::{Cons, Nil};
+fn main() {
+    let list = Cons(1, Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
+}
+```
+
+### `Deref` for Smart Pointers
+Implementing the `Deref` trait allows you to customize the behavior of the *dereference* operator `*`.
+
+#### Implementing `Deref`
+```rs
+use std::ops::Deref;
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+```
+When `*y` is called, `*(y.deref())` is run behind the scenes.
+
+#### Deref Coercion
+*Deref coercion*: in arguments to functions and methods if we pass a type that implements the `Deref` trait but doesn't match the parameter type in the function/method definition, a sequence of calls to the `deref` method converts the type we provided into the type the parameter needs (if possible).
+
+Implement `DerefMut` trait to override the `*` operator on mutalbe references.
+
+### `Drop` Trait
+Specifies the code to run when a value goes out of scope (cleanup code).
+
+```rs
+struct CustomSmartPointer {
+    data: String,
+}
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
+    }
+}
+```
+
+#### Dropping a Value Early
+Use the `std::mem::drop` function to cleanup the value early.
+```rs
+let c = CustomSmartPointer {
+    data: String::from("some data"),
+};
+drop(c);
+```
+
+### `Rc<T>`, the Reference Counted Smart Pointer
+Use `Rc<T>` (reference counting) to enable mutliple ownership (eg. a graph with each of a node's edge owning that node).
+
+```rs
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
+}
+use crate::List::{Cons, Nil};
+use std::rc::Rc;
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    let b = Cons(3, Rc::clone(&a));
+    let c = Cons(4, Rc::clone(&a));
+}
+```
+
+Calling `Rc::clone` causes the reference count to the data within Rc<T> to increase.
+
+Via immutable references, `Rc<T>` allows you to share data between multiple parts of your program for reading only.
+
+### `RefCell<T>` and the Interior Mutability Pattern
+*Interior mutability*: a design pattern that allows you to mutate data even when there are immutable references to that data
+
+With `RefCell<T>`, the type represents single owernship over the data it holds, however the borrowing rules' invariants are enforced at *runtime* rather than *compile* time.
+
+#### Choosing `Box<T>`, `Rc<T>`, or `RefCell<T>`
+* `Rc<T>` enables multiple owners of the same data; `Box<T>` and `RefCell<T>`
+  have single owners.
+* `Box<T>` allows immutable or mutable borrows checked at compile time; `Rc<T>`
+  allows only immutable borrows checked at compile time; `RefCell<T>` allows
+  immutable or mutable borrows checked at runtime.
+* Because `RefCell<T>` allows mutable borrows checked at runtime, you can
+  mutate the value inside the `RefCell<T>` even when the `RefCell<T>` is
+  immutable.
+
+#### Interior Mutability Use Case: Mock Objects
+See https://doc.rust-lang.org/book/ch15-05-interior-mutability.html for example
+
+#### Multiple Owners of Mutable Data by Combining `Rc<T>` and `RefCell<T>`
+`Rc<T>` holding a `RefCell<T>` allows you to have a value that can have multiple owners *and* that you can mutate: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
+
+### Reference Cycles Can Leak Memory
+Rust allows memory leaks by using `Rc<t>` and `RefCell<T>`. Possible to create references where items refere to each other in a cycle. This creates memory leaks because the reference count of each item in the cycle will never reach 0, and the values will never be dropped: https://doc.rust-lang.org/book/ch15-06-reference-cycles.html
 
 
 # Standard Library
