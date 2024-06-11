@@ -411,6 +411,158 @@ let b: i32 = **r1;       // two dereferences get us to the heap value
 ```
 
 
+
+
+## Error Handling
+### Panic
+```rs
+panic!("crash and burn");
+```
+
+### Recoverable Errors with `Result`
+```rs
+enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+```
+
+Using `match` statement:
+```rs
+use std::fs::File;
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => panic!("Problem opening the file: {:?}", error),
+    };
+}
+```
+
+#### Matching on Different Errors
+```rs
+use std::fs::File;
+use std::io::ErrorKind;
+fn main() {
+    let greeting_file_result = File::open("hello.txt");
+    let greeting_file = match greeting_file_result {
+        Ok(file) => file,
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create("hello.txt") {
+                Ok(fc) => fc,
+                Err(e) => panic!("Problem creating the file: {:?}", e),
+            },
+            other_error => {
+                panic!("Problem opening the file: {:?}", other_error);
+            }
+        },
+    };
+}
+```
+
+#### `unwrap`
+If the `Result` value is the `Ok` variant, `unwrap` will return
+the value inside the `Ok`. If the `Result` is the `Err` variant, `unwrap` will
+call the `panic!` macro for us. Here is an example of `unwrap` in action:
+```rs
+let greeting_file = File::open("hello.txt").unwrap();
+```
+
+#### `except`
+Similarly, the `expect` method lets us also choose the `panic!` error message.
+```rs
+let greeting_file = File::open("hello.txt")
+    .expect("hello.txt should be included in this project");
+```
+
+### Propogating Errors
+Return a `Result`:
+```rs
+use std::fs::File;
+use std::io::{self, Read};
+fn read_username_from_file() -> Result<String, io::Error> {
+    let username_file_result = File::open("hello.txt");
+    let mut username_file = match username_file_result {
+        Ok(file) => file,
+        Err(e) => return Err(e),
+    };
+    let mut username = String::new();
+    match username_file.read_to_string(&mut username) {
+        Ok(_) => Ok(username),
+        Err(e) => Err(e),
+    }
+}
+```
+
+Using the question mark operator:
+```rs
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username_file = File::open("hello.txt")?;
+    let mut username = String::new();
+    username_file.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+If the value of the `Result` is an `Ok`, the value inside the `Ok` will
+get returned from this expression, and the program will continue. If the value
+is an `Err`, the `Err` will be returned from the whole function as if we had
+used the `return` keyword so the error value gets propagated to the calling
+code.
+
+There is a difference between what the `match` expression from Listing 9-6 does
+and what the `?` operator does: error values that have the `?` operator called
+on them go through the `from` function, defined in the `From` trait in the
+standard library, which is used to convert values from one type into another.
+When the `?` operator calls the `from` function, the error type received is
+converted into the error type defined in the return type of the current
+function. This is useful when a function returns one error type to represent
+all the ways a function might fail, even if parts might fail for many different
+reasons.
+
+Even Shorter Code:
+```rs
+fn read_username_from_file() -> Result<String, io::Error> {
+    let mut username = String::new();
+    File::open("hello.txt")?.read_to_string(&mut username)?;
+    Ok(username)
+}
+```
+
+#### More on the `?` operator
+The `?` operator can only be used in functions whose return type is compatible
+with the value the `?` is used on. This is because the `?` operator is defined
+to perform an early return of a value out of the function.
+
+The error message also mentioned that `?` can be used with `Option<T>` values
+as well.
+
+### Custom Types for Validation
+Custom type for integers from 1 to 100:
+```rs
+pub struct Guess {
+    value: i32,
+}
+
+impl Guess {
+    pub fn new(value: i32) -> Guess {
+        if value < 1 || value > 100 {
+            panic!("Guess value must be between 1 and 100, got {}.", value);
+        }
+
+        Guess { value }
+    }
+
+    pub fn value(&self) -> i32 {
+        self.value
+    }
+}
+```
+
+
+
+
+
+
 ## Concurrency
 ### Threads for Simultaneous Code
 Rust uses 1:1 model of thread implementation: a program uses one OS thread per one language thread.
@@ -880,7 +1032,7 @@ fn main() {
 
 
 
-# Built-In Package
+# Built-In
 ## Variables
 ### Mutability
 - Variables are immutable by default
@@ -1660,150 +1812,7 @@ match msg {
 }
 ```
 
-## Error Handling
-### Panic
-```rs
-panic!("crash and burn");
-```
 
-### Recoverable Errors with `Result`
-```rs
-enum Result<T, E> {
-    Ok(T),
-    Err(E),
-}
-```
-
-Using `match` statement:
-```rs
-use std::fs::File;
-fn main() {
-    let greeting_file_result = File::open("hello.txt");
-    let greeting_file = match greeting_file_result {
-        Ok(file) => file,
-        Err(error) => panic!("Problem opening the file: {:?}", error),
-    };
-}
-```
-
-#### Matching on Different Errors
-```rs
-use std::fs::File;
-use std::io::ErrorKind;
-fn main() {
-    let greeting_file_result = File::open("hello.txt");
-    let greeting_file = match greeting_file_result {
-        Ok(file) => file,
-        Err(error) => match error.kind() {
-            ErrorKind::NotFound => match File::create("hello.txt") {
-                Ok(fc) => fc,
-                Err(e) => panic!("Problem creating the file: {:?}", e),
-            },
-            other_error => {
-                panic!("Problem opening the file: {:?}", other_error);
-            }
-        },
-    };
-}
-```
-
-#### `unwrap`
-If the `Result` value is the `Ok` variant, `unwrap` will return
-the value inside the `Ok`. If the `Result` is the `Err` variant, `unwrap` will
-call the `panic!` macro for us. Here is an example of `unwrap` in action:
-```rs
-let greeting_file = File::open("hello.txt").unwrap();
-```
-
-#### `except`
-Similarly, the `expect` method lets us also choose the `panic!` error message.
-```rs
-let greeting_file = File::open("hello.txt")
-    .expect("hello.txt should be included in this project");
-```
-
-### Propogating Errors
-Return a `Result`:
-```rs
-use std::fs::File;
-use std::io::{self, Read};
-fn read_username_from_file() -> Result<String, io::Error> {
-    let username_file_result = File::open("hello.txt");
-    let mut username_file = match username_file_result {
-        Ok(file) => file,
-        Err(e) => return Err(e),
-    };
-    let mut username = String::new();
-    match username_file.read_to_string(&mut username) {
-        Ok(_) => Ok(username),
-        Err(e) => Err(e),
-    }
-}
-```
-
-Using the question mark operator:
-```rs
-fn read_username_from_file() -> Result<String, io::Error> {
-    let mut username_file = File::open("hello.txt")?;
-    let mut username = String::new();
-    username_file.read_to_string(&mut username)?;
-    Ok(username)
-}
-```
-If the value of the `Result` is an `Ok`, the value inside the `Ok` will
-get returned from this expression, and the program will continue. If the value
-is an `Err`, the `Err` will be returned from the whole function as if we had
-used the `return` keyword so the error value gets propagated to the calling
-code.
-
-There is a difference between what the `match` expression from Listing 9-6 does
-and what the `?` operator does: error values that have the `?` operator called
-on them go through the `from` function, defined in the `From` trait in the
-standard library, which is used to convert values from one type into another.
-When the `?` operator calls the `from` function, the error type received is
-converted into the error type defined in the return type of the current
-function. This is useful when a function returns one error type to represent
-all the ways a function might fail, even if parts might fail for many different
-reasons.
-
-Even Shorter Code:
-```rs
-fn read_username_from_file() -> Result<String, io::Error> {
-    let mut username = String::new();
-    File::open("hello.txt")?.read_to_string(&mut username)?;
-    Ok(username)
-}
-```
-
-#### More on the `?` operator
-The `?` operator can only be used in functions whose return type is compatible
-with the value the `?` is used on. This is because the `?` operator is defined
-to perform an early return of a value out of the function.
-
-The error message also mentioned that `?` can be used with `Option<T>` values
-as well.
-
-### Custom Types for Validation
-Custom type for integers from 1 to 100:
-```rs
-pub struct Guess {
-    value: i32,
-}
-
-impl Guess {
-    pub fn new(value: i32) -> Guess {
-        if value < 1 || value > 100 {
-            panic!("Guess value must be between 1 and 100, got {}.", value);
-        }
-
-        Guess { value }
-    }
-
-    pub fn value(&self) -> i32 {
-        self.value
-    }
-}
-```
 
 ## Generic Types, Traits, and Lifetimes
 ### Generic Data Types
@@ -2016,240 +2025,13 @@ let s: &'static str = "I have a static lifetime.";
 ```
 The text of this string is stored directly in the program's binary, which is always available.
 
-## Iterators and Closures
-### Closures
-Examples:
-```rs
-user_preference.unwrap_or_else(|| self.most_stocked())
-```
-```rs
-let expensive_closure = |num: u32| -> u32 {
-    println!("calculating slowly...");
-    thread::sleep(Duration::from_secs(2));
-    num
-};
-```
-```rs
-let add_one_v2 = |x: u32| -> u32 { x + 1 };
-let add_one_v3 = |x|             { x + 1 };
-let add_one_v4 = |x|               x + 1  ;
-```
-
-#### Assigning Types
-If necessary compiler will infer closure types, often when the closue is first used. 
-```rs
-let example_closure = |x| x;
-let s = example_closure(String::from("hello")); 
-let n = example_closure(5); // this will cause COMPILE ERROR - changing type of closur
-```
-
-#### Capturing References or Moving Ownership
-Immutable reference in closure:
-```rs
-let list = vec![1, 2, 3];
-println!("Before defining closure: {:?}", list);
-
-let only_borrows = || println!("From closure: {:?}", list); // closure: immutable reference
-
-println!("Before calling closure: {:?}", list);
-only_borrows();
-println!("After calling closure: {:?}", list);
-```
-
-Mutable reference in closure:
-```rs
-let mut list = vec![1, 2, 3];
-println!("Before defining closure: {:?}", list);
-
-let mut borrows_mutably = || list.push(7); // closure: mutable reference
-// immutable reference not allowed, due to mutable reference in use
-borrows_mutably();
-println!("After calling closure: {:?}", list); // mutable reference no longer in use
-```
-
-Force closure to tak ownership of the values it uses in the environment, use the `move` keyword before the parameter list. 
-```rs
-let list = vec![1, 2, 3];
-println!("Before defining closure: {:?}", list);
-
-thread::spawn(move || println!("From thread: {:?}", list)) // move ownership of `list` to new thread
-    .join()
-    .unwrap();
-```
-
-#### Closure Traits
-Closures will automatically implement one, two, or all three of these `Fn` traits, in an additive fashion, depending on how the closure’s body handles the values:
-1. `FnOnce` applies to closures that can be called once. All closures implement
-   at least this trait, because all closures can be called. A closure that
-   moves captured values out of its body will only implement `FnOnce` and none
-   of the other `Fn` traits, because it can only be called once.
-2. `FnMut` applies to closures that don’t move captured values out of their
-   body, but that might mutate the captured values. These closures can be
-   called more than once.
-3. `Fn` applies to closures that don’t move captured values out of their body
-   and that don’t mutate captured values, as well as closures that capture
-   nothing from their environment. These closures can be called more than once
-   without mutating their environment, which is important in cases such as
-   calling a closure multiple times concurrently.
-
-### Iterators
-#### `Iterator` Trait
-All iterators implement the `Iterator` trait
-```rs
-pub trait Iterator {
-    type Item;
-    fn next(&mut self) -> Option<Self::Item>;
-    // methods with default implementations elided
-}
-```
-
-#### Get iterator
-```rs
-let mut v1_iter = v1.iter();
-assert_eq!(v1_iter.next(), Some(&1));
-```
-`iter()`: returns immutable references
-`into_iter()`: returns owned values
-`iter_mut()`: returns mutable references
-
-#### Methods that Produce Other Iterators
-`collect()` method consumes the iterator (returned by `map()`) and collects the resulting values into a collection data type.
-```rs
-let v1: Vec<i32> = vec![1, 2, 3];
-let v2: Vec<_> = v1.iter().map(|x| x + 1).collect();
-```
-
-#### Filter
-```rs
-shoes.into_iter().filter(|s| s.size == shoe_size).collect()
-```
-
-## Smart Pointers
-Provide functionality beyond what references provide. Allows you to have multiple owners.
-
-In many cases smart pointers *own* the data they point to.
-
-`String` and `Vec<T>` are smart pointers.
-
-Usuall implemnted using structs, implementing the `Deref` and `Drop` traits.
-
-### Using `Box<T>` to Point to Data on the Heap
-Allow you to store data on the heap rather than the stack.
-
-Use cases:
-- When you have a type whose size can't be known at compile time and you want to use a value of that type in a context that requires an exact size
-- When you have a large amount of data and you want to transfer ownership but ensure the data won't be copied when you do so
-- When you want to own a value and you car only that it's a type that implements a particular trait rather than being of a specific type
-
-#### Syntax
-```rs
-let b = Box::new(5);
-```
-
-#### Enabling Recursive Types with Boxes
-```rs
-enum List {
-    Cons(i32, Box<List>),
-    Nil,
-}
-use crate::List::{Cons, Nil};
-fn main() {
-    let list = Cons(1, Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
-}
-```
-
-### `Deref` for Smart Pointers
-Implementing the `Deref` trait allows you to customize the behavior of the *dereference* operator `*`.
-
-#### Implementing `Deref`
-```rs
-use std::ops::Deref;
-impl<T> Deref for MyBox<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-```
-When `*y` is called, `*(y.deref())` is run behind the scenes.
-
-#### Deref Coercion
-*Deref coercion*: in arguments to functions and methods if we pass a type that implements the `Deref` trait but doesn't match the parameter type in the function/method definition, a sequence of calls to the `deref` method converts the type we provided into the type the parameter needs (if possible).
-
-Implement `DerefMut` trait to override the `*` operator on mutalbe references.
-
-### `Drop` Trait
-Specifies the code to run when a value goes out of scope (cleanup code).
-
-```rs
-struct CustomSmartPointer {
-    data: String,
-}
-impl Drop for CustomSmartPointer {
-    fn drop(&mut self) {
-        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
-    }
-}
-```
-
-#### Dropping a Value Early
-Use the `std::mem::drop` function to cleanup the value early.
-```rs
-let c = CustomSmartPointer {
-    data: String::from("some data"),
-};
-drop(c);
-```
-
-### `Rc<T>`, the Reference Counted Smart Pointer
-Use `Rc<T>` (reference counting) to enable mutliple ownership (eg. a graph with each of a node's edge owning that node).
-
-```rs
-enum List {
-    Cons(i32, Rc<List>),
-    Nil,
-}
-use crate::List::{Cons, Nil};
-use std::rc::Rc;
-fn main() {
-    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
-    let b = Cons(3, Rc::clone(&a));
-    let c = Cons(4, Rc::clone(&a));
-}
-```
-
-Calling `Rc::clone` causes the reference count to the data within Rc<T> to increase.
-
-Via immutable references, `Rc<T>` allows you to share data between multiple parts of your program for reading only.
-
-### `RefCell<T>` and the Interior Mutability Pattern
-*Interior mutability*: a design pattern that allows you to mutate data even when there are immutable references to that data
-
-With `RefCell<T>`, the type represents single owernship over the data it holds, however the borrowing rules' invariants are enforced at *runtime* rather than *compile* time.
-
-#### Choosing `Box<T>`, `Rc<T>`, or `RefCell<T>`
-* `Rc<T>` enables multiple owners of the same data; `Box<T>` and `RefCell<T>`
-  have single owners.
-* `Box<T>` allows immutable or mutable borrows checked at compile time; `Rc<T>`
-  allows only immutable borrows checked at compile time; `RefCell<T>` allows
-  immutable or mutable borrows checked at runtime.
-* Because `RefCell<T>` allows mutable borrows checked at runtime, you can
-  mutate the value inside the `RefCell<T>` even when the `RefCell<T>` is
-  immutable.
-
-#### Interior Mutability Use Case: Mock Objects
-See https://doc.rust-lang.org/book/ch15-05-interior-mutability.html for example
-
-#### Multiple Owners of Mutable Data by Combining `Rc<T>` and `RefCell<T>`
-`Rc<T>` holding a `RefCell<T>` allows you to have a value that can have multiple owners *and* that you can mutate: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
-
-### Reference Cycles Can Leak Memory
-Rust allows memory leaks by using `Rc<t>` and `RefCell<T>`. Possible to create references where items refere to each other in a cycle. This creates memory leaks because the reference count of each item in the cycle will never reach 0, and the values will never be dropped: https://doc.rust-lang.org/book/ch15-06-reference-cycles.html
-
 
 
 ## Advanced Rust Features
 ### Unsafe Rust
+
+
+
 
 
 
@@ -2457,6 +2239,244 @@ for word: &str in text.split_whitespace() {
     *count += 1;
 }
 ```
+
+
+
+
+
+## Iterators and Closures
+### Closures
+Examples:
+```rs
+user_preference.unwrap_or_else(|| self.most_stocked())
+```
+```rs
+let expensive_closure = |num: u32| -> u32 {
+    println!("calculating slowly...");
+    thread::sleep(Duration::from_secs(2));
+    num
+};
+```
+```rs
+let add_one_v2 = |x: u32| -> u32 { x + 1 };
+let add_one_v3 = |x|             { x + 1 };
+let add_one_v4 = |x|               x + 1  ;
+```
+
+#### Assigning Types
+If necessary compiler will infer closure types, often when the closue is first used. 
+```rs
+let example_closure = |x| x;
+let s = example_closure(String::from("hello")); 
+let n = example_closure(5); // this will cause COMPILE ERROR - changing type of closur
+```
+
+#### Capturing References or Moving Ownership
+Immutable reference in closure:
+```rs
+let list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+let only_borrows = || println!("From closure: {:?}", list); // closure: immutable reference
+
+println!("Before calling closure: {:?}", list);
+only_borrows();
+println!("After calling closure: {:?}", list);
+```
+
+Mutable reference in closure:
+```rs
+let mut list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+let mut borrows_mutably = || list.push(7); // closure: mutable reference
+// immutable reference not allowed, due to mutable reference in use
+borrows_mutably();
+println!("After calling closure: {:?}", list); // mutable reference no longer in use
+```
+
+Force closure to tak ownership of the values it uses in the environment, use the `move` keyword before the parameter list. 
+```rs
+let list = vec![1, 2, 3];
+println!("Before defining closure: {:?}", list);
+
+thread::spawn(move || println!("From thread: {:?}", list)) // move ownership of `list` to new thread
+    .join()
+    .unwrap();
+```
+
+#### Closure Traits
+Closures will automatically implement one, two, or all three of these `Fn` traits, in an additive fashion, depending on how the closure’s body handles the values:
+1. `FnOnce` applies to closures that can be called once. All closures implement
+   at least this trait, because all closures can be called. A closure that
+   moves captured values out of its body will only implement `FnOnce` and none
+   of the other `Fn` traits, because it can only be called once.
+2. `FnMut` applies to closures that don’t move captured values out of their
+   body, but that might mutate the captured values. These closures can be
+   called more than once.
+3. `Fn` applies to closures that don’t move captured values out of their body
+   and that don’t mutate captured values, as well as closures that capture
+   nothing from their environment. These closures can be called more than once
+   without mutating their environment, which is important in cases such as
+   calling a closure multiple times concurrently.
+
+### Iterators
+#### `Iterator` Trait
+All iterators implement the `Iterator` trait
+```rs
+pub trait Iterator {
+    type Item;
+    fn next(&mut self) -> Option<Self::Item>;
+    // methods with default implementations elided
+}
+```
+
+#### Get iterator
+```rs
+let mut v1_iter = v1.iter();
+assert_eq!(v1_iter.next(), Some(&1));
+```
+`iter()`: returns immutable references
+`into_iter()`: returns owned values
+`iter_mut()`: returns mutable references
+
+#### Methods that Produce Other Iterators
+`collect()` method consumes the iterator (returned by `map()`) and collects the resulting values into a collection data type.
+```rs
+let v1: Vec<i32> = vec![1, 2, 3];
+let v2: Vec<_> = v1.iter().map(|x| x + 1).collect();
+```
+
+#### Filter
+```rs
+shoes.into_iter().filter(|s| s.size == shoe_size).collect()
+```
+
+
+
+## Smart Pointers
+Provide functionality beyond what references provide. Allows you to have multiple owners.
+
+In many cases smart pointers *own* the data they point to.
+
+`String` and `Vec<T>` are smart pointers.
+
+Usuall implemnted using structs, implementing the `Deref` and `Drop` traits.
+
+### Using `Box<T>` to Point to Data on the Heap
+Allow you to store data on the heap rather than the stack.
+
+Use cases:
+- When you have a type whose size can't be known at compile time and you want to use a value of that type in a context that requires an exact size
+- When you have a large amount of data and you want to transfer ownership but ensure the data won't be copied when you do so
+- When you want to own a value and you car only that it's a type that implements a particular trait rather than being of a specific type
+
+#### Syntax
+```rs
+let b = Box::new(5);
+```
+
+#### Enabling Recursive Types with Boxes
+```rs
+enum List {
+    Cons(i32, Box<List>),
+    Nil,
+}
+use crate::List::{Cons, Nil};
+fn main() {
+    let list = Cons(1, Box::new(Cons(2, Box::new(Cons(3, Box::new(Nil))))));
+}
+```
+
+### `Deref` for Smart Pointers
+Implementing the `Deref` trait allows you to customize the behavior of the *dereference* operator `*`.
+
+#### Implementing `Deref`
+```rs
+use std::ops::Deref;
+impl<T> Deref for MyBox<T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+```
+When `*y` is called, `*(y.deref())` is run behind the scenes.
+
+#### Deref Coercion
+*Deref coercion*: in arguments to functions and methods if we pass a type that implements the `Deref` trait but doesn't match the parameter type in the function/method definition, a sequence of calls to the `deref` method converts the type we provided into the type the parameter needs (if possible).
+
+Implement `DerefMut` trait to override the `*` operator on mutalbe references.
+
+### `Drop` Trait
+Specifies the code to run when a value goes out of scope (cleanup code).
+
+```rs
+struct CustomSmartPointer {
+    data: String,
+}
+impl Drop for CustomSmartPointer {
+    fn drop(&mut self) {
+        println!("Dropping CustomSmartPointer with data `{}`!", self.data);
+    }
+}
+```
+
+#### Dropping a Value Early
+Use the `std::mem::drop` function to cleanup the value early.
+```rs
+let c = CustomSmartPointer {
+    data: String::from("some data"),
+};
+drop(c);
+```
+
+### `Rc<T>`, the Reference Counted Smart Pointer
+Use `Rc<T>` (reference counting) to enable mutliple ownership (eg. a graph with each of a node's edge owning that node).
+
+```rs
+enum List {
+    Cons(i32, Rc<List>),
+    Nil,
+}
+use crate::List::{Cons, Nil};
+use std::rc::Rc;
+fn main() {
+    let a = Rc::new(Cons(5, Rc::new(Cons(10, Rc::new(Nil)))));
+    let b = Cons(3, Rc::clone(&a));
+    let c = Cons(4, Rc::clone(&a));
+}
+```
+
+Calling `Rc::clone` causes the reference count to the data within Rc<T> to increase.
+
+Via immutable references, `Rc<T>` allows you to share data between multiple parts of your program for reading only.
+
+### `RefCell<T>` and the Interior Mutability Pattern
+*Interior mutability*: a design pattern that allows you to mutate data even when there are immutable references to that data
+
+With `RefCell<T>`, the type represents single owernship over the data it holds, however the borrowing rules' invariants are enforced at *runtime* rather than *compile* time.
+
+#### Choosing `Box<T>`, `Rc<T>`, or `RefCell<T>`
+* `Rc<T>` enables multiple owners of the same data; `Box<T>` and `RefCell<T>`
+  have single owners.
+* `Box<T>` allows immutable or mutable borrows checked at compile time; `Rc<T>`
+  allows only immutable borrows checked at compile time; `RefCell<T>` allows
+  immutable or mutable borrows checked at runtime.
+* Because `RefCell<T>` allows mutable borrows checked at runtime, you can
+  mutate the value inside the `RefCell<T>` even when the `RefCell<T>` is
+  immutable.
+
+#### Interior Mutability Use Case: Mock Objects
+See https://doc.rust-lang.org/book/ch15-05-interior-mutability.html for example
+
+#### Multiple Owners of Mutable Data by Combining `Rc<T>` and `RefCell<T>`
+`Rc<T>` holding a `RefCell<T>` allows you to have a value that can have multiple owners *and* that you can mutate: https://doc.rust-lang.org/book/ch15-05-interior-mutability.html
+
+### Reference Cycles Can Leak Memory
+Rust allows memory leaks by using `Rc<t>` and `RefCell<T>`. Possible to create references where items refere to each other in a cycle. This creates memory leaks because the reference count of each item in the cycle will never reach 0, and the values will never be dropped: https://doc.rust-lang.org/book/ch15-06-reference-cycles.html
+
+
 
 
 
