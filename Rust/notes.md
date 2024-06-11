@@ -684,6 +684,202 @@ Because types that are made up of `Send` and `Sync` traits are automatically als
 
 
 
+## Object-Oriented Programming Features of Rust
+### Characteristics of Object-Oriented Languages
+#### Encapsulation Example
+Only public members of `AveragedCollection` are `add`, `remove`, and `average` methods:
+```rs
+pub struct AveragedCollection {
+    list: Vec<i32>, 
+    average: f64,
+}
+
+impl AveragedCollection {
+    pub fn add(&mut self, value: i32) {
+        self.list.push(value);
+        self.update_average();
+    }
+
+    pub fn remove(&mut self) -> Option<i32> {
+        let result = self.list.pop();
+        match result {
+            Some(value) => {
+                self.update_average();
+                Some(value)
+            }
+            None => None,
+        }
+    }
+
+    pub fn average(&self) -> f64 {
+        self.average
+    }
+
+    fn update_average(&mut self) {
+        let total: i32 = self.list.iter().sum();
+        self.average = total as f64 / self.list.len() as f64;
+    }
+}
+```
+
+#### Inheritance in Rust
+Rust does not have inheritance, but solves the two use cases.
+
+1. For reuse of code: can be implemented with traits
+2. Polymorphism (enable child type to be used in the same places as the parent type): Rust uses generics to abstract over different possible types and trais bounds to impose constraints on what those types must provide.
+
+
+### Using Trait Objects For Polymorphism
+#### Trait Objects
+A trait object points to both an instance of a type implementing our specified trait and a table used to look up trait methods on that type at runtiime.
+
+Create a trait object by specifying some sort of pointer, such as a `&` reference or a `Box<T>` smart pointer, then using the `dyn` keyword, and then specifying the relevant trait.
+
+Define `Draw` trait:
+```rs
+pub trait Draw {
+    fn draw(&self);
+}
+```
+
+Define `Screen` struct with vector holding types implementing `Draw`:
+```rs
+pub struct Screen {
+    pub components: Vec<Box<dyn Draw>>,
+}
+
+impl Screen {
+    pub fn run(&self) {
+        for component in self.components.iter() {
+            component.draw();
+        }
+    }
+}
+```
+
+While a generic type parameter can only be substituted with on concrete type at a tyime, trait objects allow for multiple concrete types to fill in for the trait object at runtime.
+
+Types implementing `Draw`:
+```rs
+pub struct Button {
+    pub width: u32,
+    pub height: u32,
+    pub label: String,
+}
+
+impl Draw for Button {
+    fn draw(&self) {
+        // code to actually draw a button
+    }
+}
+```
+
+All together:
+```rs
+fn main() {
+    let screen = Screen {
+        components: vec![
+            Box::new(SelectBox {
+                width: 75,
+                height: 10,
+                options: vec![
+                    String::from("Yes"),
+                    String::from("Maybe"),
+                    String::from("No"),
+                ],
+            }),
+            Box::new(Button {
+                width: 50,
+                height: 10,
+                label: String::from("OK"),
+            }),
+        ],
+    };
+
+    screen.run();
+}
+```
+
+#### Performance: Trait Objects Perform Dynamic Dispatch
+Compiler emits code that at runtime will figure out which method to call.
+
+This lookup incurs a **runtime cost** that doesn't occur with static dispatch. It also prevents the compiler from choosing to inline a method's code, which in turn prevents some optimizations.
+
+
+### Implementing an Object-Oriented Design Pattern
+Implementing the *state pattern*.
+
+#### Traditional implementation using the trait objects
+https://doc.rust-lang.org/book/ch17-03-oo-design-patterns.html
+
+#### Encoding States and Behavior as Types
+```rs
+// src/lib.rs
+pub struct Post {
+    content: String,
+}
+
+pub struct DraftPost {
+    content: String,
+}
+
+pub struct PendingReviewPost {
+    content: String,
+}
+
+impl Post {
+    pub fn new() -> DraftPost {
+        DraftPost {
+            content: String::new(),
+        }
+    }
+
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+}
+
+impl DraftPost {
+    pub fn add_text(&mut self, text: &str) {
+        self.content.push_str(text);
+    }
+
+    pub fn request_review(self) -> PendingReviewPost {
+        PendingReviewPost {
+            content: self.content,
+        }
+    }
+}
+
+impl PendingReviewPost {
+    pub fn approve(self) -> Post {
+        Post {
+            content: self.content,
+        }
+    }
+}
+
+// src/main.rs
+use blog::Post;
+
+fn main() {
+    let mut post = Post::new();
+
+    post.add_text("I ate a salad for lunch today");
+
+    let post = post.request_review();
+
+    let post = post.approve();
+
+    assert_eq!("I ate a salad for lunch today", post.content());
+}
+```
+
+
+
+
+
+
 # Built-In Package
 ## Variables
 ### Mutability
@@ -946,6 +1142,15 @@ for number in (1..4).rev() {
 println!("LIFTOFF!!!");
 ```
 
+#### For Loop Pattern Matching
+```rs
+let v = vec!['a', 'b', 'c'];
+
+for (index, value) in v.iter().enumerate() {
+    println!("{} is at index {}", value, index);
+}
+```
+
 ## Structs
 ### Basics
 ```rs
@@ -1129,7 +1334,8 @@ enum Option<T> {
 }
 ``` 
 
-### `match` Control Flow
+### Match Statement
+#### Basics
 ```rs
 enum Coin {
     Penny,
@@ -1151,7 +1357,7 @@ fn value_in_cents(coin: Coin) -> u8 {
 }
 ```
 
-Accessing a value:
+#### Accessing a value:
 ```rs
 fn value_in_cents(coin: Coin) -> u8 {
     match coin {
@@ -1197,7 +1403,30 @@ match dice_roll {
 }
 ```
 
-### `if` `let`
+#### Multiple Patterns
+Use `|` to match multiple patterns
+```rs
+let x = 1;
+
+match x {
+    1 | 2 => println!("one or two"),
+    3 => println!("three"),
+    _ => println!("anything"),
+}
+```
+
+#### Matching to Range
+Use `..=` to match to an *inclusive* range of values
+```rs
+let x = 5;
+
+match x {
+    1..=5 => println!("one through five"),
+    _ => println!("something else"),
+}
+```
+
+### If Let Statement
 Less verbose way to handle values that match one pattern while ignoring the rest.
 
 Instead of:
@@ -1224,6 +1453,210 @@ if let Coin::Quarter(state) = coin {
     println!("State quarter from {:?}!", state);
 } else {
     count += 1;
+}
+```
+
+### While Let Conditional Loop
+Allows a `while` loop to run fo as long as a pattern continues to match:
+```rs
+let mut stack = Vec::new();
+
+stack.push(1);
+stack.push(2);
+stack.push(3);
+
+while let Some(top) = stack.pop() {
+    println!("{}", top);
+}
+```
+
+### Let statement
+```rs
+let (x, y, z) = (1, 2, 3);
+```
+
+### Function Parameters
+```rs
+fn print_coordinates(&(x, y): &(i32, i32)) {
+    println!("Current location: ({}, {})", x, y);
+}
+
+fn main() {
+    let point = (3, 5);
+    print_coordinates(&point);
+}
+```
+
+### Refutability: Whether a Pattern Might Fail to Match
+*irrefutable*: patterns that will match for any possible values passed. Ex: `x` in `let x = 5`.
+
+*refutable*: patterns that can fail to match for some possible value: Ex: `Some(x)` in `if let Some(x) = a_value`
+
+### Destructuring
+#### Destructuring structs
+```rs
+struct Point {
+    x: i32,
+    y: i32,
+}
+
+fn main() {
+    let p = Point { x: 0, y: 7 };
+
+    let Point { x: a, y: b } = p; // **This line**
+    assert_eq!(0, a);
+    assert_eq!(7, b);
+}
+```
+
+With same field names:
+```rs
+fn main() {
+    let p = Point { x: 0, y: 7 };
+
+    let Point { x, y } = p;
+    assert_eq!(0, x);
+    assert_eq!(7, y);
+}
+```
+
+Matching:
+```rs
+fn main() {
+    let p = Point { x: 0, y: 7 };
+
+    match p {
+        Point { x, y: 0 } => println!("On the x axis at {x}"),
+        Point { x: 0, y } => println!("On the y axis at {y}"),
+        Point { x, y } => {
+            println!("On neither axis: ({x}, {y})");
+        }
+    }
+}
+```
+
+#### Destructuring Enums
+```rs
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(i32, i32, i32),
+}
+
+fn main() {
+    let msg = Message::ChangeColor(0, 160, 255);
+
+    match msg {
+        Message::Quit => {
+            println!("The Quit variant has no data to destructure.");
+        }
+        Message::Move { x, y } => {
+            println!("Move in the x direction {x} and in the y direction {y}");
+        }
+        Message::Write(text) => {
+            println!("Text message: {text}");
+        }
+        Message::ChangeColor(r, g, b) => {
+            println!("Change the color to red {r}, green {g}, and blue {b}",)
+        }
+    }
+}
+```
+
+#### Destructuring Nested Structs and Enums
+```rs
+enum Color {
+    Rgb(i32, i32, i32),
+    Hsv(i32, i32, i32),
+}
+
+enum Message {
+    Quit,
+    Move { x: i32, y: i32 },
+    Write(String),
+    ChangeColor(Color),
+}
+
+fn main() {
+    let msg = Message::ChangeColor(Color::Hsv(0, 160, 255));
+
+    match msg {
+        Message::ChangeColor(Color::Rgb(r, g, b)) => {
+            println!("Change color to red {r}, green {g}, and blue {b}");
+        }
+        Message::ChangeColor(Color::Hsv(h, s, v)) => {
+            println!("Change color to hue {h}, saturation {s}, value {v}")
+        }
+        _ => (),
+    }
+}
+```
+
+Structs and Tuples:
+```rs
+let ((feet, inches), Point { x, y }) = ((3, 10), Point { x: 3, y: -10 });
+```
+
+#### Ignoring Remaing Parts of a Value with `..`
+Use `..` to use specific parts and ignore the rest:
+```rs
+struct Point {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+let origin = Point { x: 0, y: 0, z: 0 };
+
+match origin {
+    Point { x, .. } => println!("x is {}", x),
+}
+```
+
+With a tuple:
+```rs
+fn main() {
+    let numbers = (2, 4, 8, 16, 32);
+
+    match numbers {
+        (first, .., last) => {
+            println!("Some numbers: {first}, {last}");
+        }
+    }
+}
+```
+
+### Match Guards
+*match guard*: an additional `if` condition, specified after the pattern in a `match` arm, that must also match for that arm to be chosen.
+```rs
+let num = Some(4);
+
+match num {
+    Some(x) if x % 2 == 0 => println!("The number {} is even", x),
+    Some(x) => println!("The number {} is odd", x),
+    None => (),
+}
+```
+
+### At Operator/Bindings (`@`)
+The *at* operator `@` lets us create a variable that holds a value at the same time as we're testing that value for pattern match.
+
+```rs
+enum Message {
+    Hello { id: i32 },
+}
+
+let msg = Message::Hello { id: 5 };
+
+match msg {
+    Message::Hello {
+        id: id_variable @ 3..=7,
+    } => println!("Found an id in range: {}", id_variable),
+    Message::Hello { id: 10..=12 } => {
+        println!("Found an id in another range")
+    }
+    Message::Hello { id } => println!("Found some other id: {}", id),
 }
 ```
 
@@ -1812,6 +2245,13 @@ See https://doc.rust-lang.org/book/ch15-05-interior-mutability.html for example
 
 ### Reference Cycles Can Leak Memory
 Rust allows memory leaks by using `Rc<t>` and `RefCell<T>`. Possible to create references where items refere to each other in a cycle. This creates memory leaks because the reference count of each item in the cycle will never reach 0, and the values will never be dropped: https://doc.rust-lang.org/book/ch15-06-reference-cycles.html
+
+
+
+## Advanced Rust Features
+### Unsafe Rust
+
+
 
 
 # Standard Library
