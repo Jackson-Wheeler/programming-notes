@@ -1055,6 +1055,15 @@ const THREE_HOURS_IN_SECONDS: u32 = 60 * 60 * 3;
 ### Shadowing
 - Shadowing: redefining a variable name
 
+### Static (Global) Variables
+```rs
+static HELLO_WORLD: &str = "Hello, world!";
+
+fn main() {
+    println!("name is: {}", HELLO_WORLD);
+}
+```
+
 ## Data Types
 - Scalar types: integers, floating-point numbers, Booleans, characters
 - Compound types:
@@ -2029,8 +2038,115 @@ The text of this string is stored directly in the program's binary, which is alw
 
 ## Advanced Rust Features
 ### Unsafe Rust
+https://doc.rust-lang.org/book/ch19-01-unsafe-rust.html
+
+Unsafe Superpowers:
+* Dereference a raw pointer
+* Call and unsafe function or method
+* Access or modify a mutable static (global) variable
+* Implement an unsafe trait
+* Access fields of `union` `S`
+
+When we know code is okay, but Rust doesn't, it's time to reach for unsafe code.
+
+#### Dereferencing a Raw Pointer
+```rs
+let mut num = 5;
+
+let r1 = &num as *const i32;
+let r2 = &mut num as *mut i32;
+
+unsafe {
+    println!("r1 is: {}", *r1);
+    println!("r2 is: {}", *r2);
+}
+```
+
+#### Calling Unsafe Function or Method
+```rs
+use std::slice;
+
+fn split_at_mut(values: &mut [i32], mid: usize) -> (&mut [i32], &mut [i32]) {
+    let len = values.len();
+    let ptr = values.as_mut_ptr();
+
+    assert!(mid <= len);
+
+    unsafe {
+        (
+            slice::from_raw_parts_mut(ptr, mid),
+            slice::from_raw_parts_mut(ptr.add(mid), len - mid),
+        )
+    }
+}
+```
 
 
+#### Extern Keyword for External Code
+`extern` keyword used to interact with code written in another language. 
+
+##### Calling Other Language's Code
+The keyword facilitates the creation and use of a *Foreign Function Interface (FFI)*, which is a way for a programming language to defind functions and enable a different (foreign) programming language to call those functions.
+
+```rs
+extern "C" {
+    fn abs(input: i32) -> i32;
+}
+
+fn main() {
+    unsafe {
+        println!("Absolute value of -3 according to C: {}", abs(-3));
+    }
+}
+```
+
+##### Providing Rust Code to be Called
+In the above, the `"C"` part defines which *application binary interface (ABI)* the external function uses.
+
+Add the `extern` keyword and specify the ABI to use. `#[no_mangle]` annotation required.
+```rs
+#[no_mangle]
+pub extern "C" fn call_from_c() {
+    println!("Just called a Rust function from C!");
+}
+```
+
+#### Mutable Static (Global) Variables
+Accessing or modifying *mutable* static varaibles is *unsafe*:
+```rs
+static mut COUNTER: u32 = 0;
+
+fn add_to_count(inc: u32) {
+    unsafe {
+        COUNTER += inc;
+    }
+}
+
+fn main() {
+    add_to_count(3);
+
+    unsafe {
+        println!("COUNTER: {}", COUNTER);
+    }
+}
+```
+
+#### Implementing an Unsafe Trait
+A trait is unsafe when at least one of its methods has some invariant that the compiler can't verify.
+```rs
+unsafe trait Foo {
+    // methods go here
+}
+
+unsafe impl Foo for i32 {
+    // method implementations go here
+}
+
+fn main() {}
+```
+
+
+### Advanced Traits
 
 
 
