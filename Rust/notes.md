@@ -2147,7 +2147,92 @@ fn main() {}
 
 
 ### Advanced Traits
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html
 
+#### Associated Types
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#specifying-placeholder-types-in-trait-definitions-with-associated-types
+
+#### Default Type Parameters
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#default-generic-type-parameters-and-operator-overloading
+
+
+#### Fully Qualified Syntax for Disambiguation: Calling Methods with the Same Name
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name
+
+#### Supertraits: Require One Trait's Functionality Within Another Trait
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#using-supertraits-to-require-one-traits-functionality-within-another-trait
+
+#### Newtype Pattern: Implement External Traits on External Types
+https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#using-the-newtype-pattern-to-implement-external-traits-on-external-types
+
+
+### Advanced Types
+https://doc.rust-lang.org/book/ch19-04-advanced-types.html
+
+#### Newtype Pattern for Type Safety and Abstraction
+https://doc.rust-lang.org/book/ch19-04-advanced-types.html#using-the-newtype-pattern-for-type-safety-and-abstraction
+
+A lightweight way to achieve encapsulation to hide implementation details.
+
+Example: create new types `Meters` and `Millimeters` and expect a certain type in given functions.
+
+#### Creating Type Synonyms with Type Aliases
+https://doc.rust-lang.org/book/ch19-04-advanced-types.html#creating-type-synonyms-with-type-aliases
+
+Give an existing type a new name.
+
+Helps reduce repetition of long types -> shorter alias.
+```rs
+type Thunk = Box<dyn Fn() + Send + 'static>;
+
+let f: Thunk = Box::new(|| println!("hi"));
+```
+
+#### The Never Type that Never Returns
+https://doc.rust-lang.org/book/ch19-04-advanced-types.html#the-never-type-that-never-returns
+
+The never type (`!`) stands in the place of the return type when a function will never return.
+
+```rs
+fn bar() -> ! {
+    // --snip--
+}
+```
+
+#### Dynamically Sized Types and the `Sized` Trait
+https://doc.rust-lang.org/book/ch19-04-advanced-types.html#dynamically-sized-types-and-the-sized-trait
+
+
+### Advanced Functions and Closures
+https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html
+
+#### Function Pointers
+https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html#function-pointers
+
+```rs
+fn add_one(x: i32) -> i32 {
+    x + 1
+}
+
+fn do_twice(f: fn(i32) -> i32, arg: i32) -> i32 {
+    f(arg) + f(arg)
+}
+
+fn main() {
+    let answer = do_twice(add_one, 5);
+
+    println!("The answer is: {}", answer);
+}
+```
+
+#### Returning Closures
+https://doc.rust-lang.org/book/ch19-05-advanced-functions-and-closures.html#returning-closures
+
+
+## Macros
+https://doc.rust-lang.org/book/ch19-06-macros.html
+
+Rust Reference on Macros: https://doc.rust-lang.org/reference/macros-by-example.html
 
 
 
