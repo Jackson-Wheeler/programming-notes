@@ -3,7 +3,7 @@ syntax = "proto3";
 package prototest.items;
 
 // A snazzy new shirt!
-message Shirt {
+message Data {
     enum Size {
         SMALL = 0;
         MEDIUM = 1;
@@ -12,4 +12,5 @@ message Shirt {
 
     string color = 1;
     Size size = 2;
+    repeated string repeated_data = 3;
 }

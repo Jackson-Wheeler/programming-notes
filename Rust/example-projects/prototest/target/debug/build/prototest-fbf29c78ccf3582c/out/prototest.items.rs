@@ -2,14 +2,16 @@
 /// A snazzy new shirt!
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Shirt {
+pub struct Data {
     #[prost(string, tag = "1")]
     pub color: ::prost::alloc::string::String,
-    #[prost(enumeration = "shirt::Size", tag = "2")]
+    #[prost(enumeration = "data::Size", tag = "2")]
     pub size: i32,
+    #[prost(string, repeated, tag = "3")]
+    pub repeated_data: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
-/// Nested message and enum types in `Shirt`.
-pub mod shirt {
+/// Nested message and enum types in `Data`.
+pub mod data {
     #[derive(
         Clone,
         Copy,
