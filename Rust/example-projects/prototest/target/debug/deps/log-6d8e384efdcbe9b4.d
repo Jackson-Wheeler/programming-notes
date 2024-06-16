@@ -1,0 +1,10 @@
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/prototest/target/debug/deps/liblog-6d8e384efdcbe9b4.rmeta: /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/lib.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/macros.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/serde.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/__private_api.rs
+
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/prototest/target/debug/deps/liblog-6d8e384efdcbe9b4.rlib: /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/lib.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/macros.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/serde.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/__private_api.rs
+
+/Users/jacksonwheeler/Projects/programming-notes/Rust/example-projects/prototest/target/debug/deps/log-6d8e384efdcbe9b4.d: /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/lib.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/macros.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/serde.rs /Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/__private_api.rs
+
+/Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/lib.rs:
+/Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/macros.rs:
+/Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/serde.rs:
+/Users/jacksonwheeler/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.21/src/__private_api.rs:
